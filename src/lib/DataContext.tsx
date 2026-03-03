@@ -6,32 +6,37 @@ import { LocalDataService } from "./localStorage";
 import { pullFromCloud, pushToCloud } from "./sync";
 
 const DataContext = createContext<DataService | null>(null);
-const SyncContext = createContext<{ lastSync: number }>({ lastSync: 0 });
+const SyncContext = createContext<{ lastSync: number; syncStatus: string }>({ lastSync: 0, syncStatus: "" });
 
 export function DataProvider({ children }: { children: React.ReactNode }) {
   const serviceRef = useRef<DataService>(new LocalDataService());
   const [lastSync, setLastSync] = useState(0);
+  const [syncStatus, setSyncStatus] = useState("");
   const initialPushDone = useRef(false);
 
   const doSync = useCallback(async () => {
-    // 首次同步：先把本地数据推上去（防止已有数据丢失）
-    if (!initialPushDone.current) {
-      await pushToCloud();
-      initialPushDone.current = true;
-    }
-    // 从云端拉取最新数据
-    const updated = await pullFromCloud();
-    if (updated) {
-      setLastSync(Date.now()); // 触发子组件刷新
+    try {
+      if (!initialPushDone.current) {
+        setSyncStatus("上传中...");
+        await pushToCloud();
+        initialPushDone.current = true;
+      }
+      setSyncStatus("同步中...");
+      const updated = await pullFromCloud();
+      if (updated) {
+        setLastSync(Date.now());
+        setSyncStatus("已同步 ✓");
+      } else {
+        setSyncStatus("已同步 ✓");
+      }
+    } catch {
+      setSyncStatus("同步失败 ✗");
     }
   }, []);
 
   useEffect(() => {
-    // 进入页面时立即同步
     doSync();
-    // 每 10 秒同步一次
     const interval = setInterval(doSync, 10000);
-    // 页面获得焦点时也同步（从后台切回来）
     const onFocus = () => doSync();
     window.addEventListener("focus", onFocus);
     return () => {
@@ -42,7 +47,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <DataContext.Provider value={serviceRef.current}>
-      <SyncContext.Provider value={{ lastSync }}>
+      <SyncContext.Provider value={{ lastSync, syncStatus }}>
         {children}
       </SyncContext.Provider>
     </DataContext.Provider>
@@ -55,7 +60,10 @@ export function useData(): DataService {
   return ctx;
 }
 
-// 用于触发组件刷新的 hook
 export function useSyncTrigger(): number {
   return useContext(SyncContext).lastSync;
+}
+
+export function useSyncStatus(): string {
+  return useContext(SyncContext).syncStatus;
 }

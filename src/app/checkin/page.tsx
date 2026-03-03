@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useUserStore } from "@/lib/store";
-import { useData, useSyncTrigger } from "@/lib/DataContext";
+import { useData, useSyncTrigger, useSyncStatus } from "@/lib/DataContext";
 import { getBeijingDateStr, compressImage } from "@/lib/utils";
 import { WeightRecord, CheckInRecord, Gender } from "@/types";
 import { WeightChart } from "@/components/WeightChart";
@@ -12,9 +12,9 @@ export default function CheckInPage() {
   const gender = useUserStore((s) => s.gender);
   const data = useData();
   const syncTrigger = useSyncTrigger();
+  const syncStatus = useSyncStatus();
   const today = getBeijingDateStr();
 
-  // 他的数据
   const [heWeight, setHeWeight] = useState("");
   const [heWeightRecords, setHeWeightRecords] = useState<WeightRecord[]>([]);
   const [heStreak, setHeStreak] = useState(0);
@@ -22,7 +22,6 @@ export default function CheckInPage() {
   const [hePhoto, setHePhoto] = useState<string | null>(null);
   const [heCheckInRecords, setHeCheckInRecords] = useState<CheckInRecord[]>([]);
 
-  // 她的数据
   const [sheWeight, setSheWeight] = useState("");
   const [sheWeightRecords, setSheWeightRecords] = useState<WeightRecord[]>([]);
   const [sheStreak, setSheStreak] = useState(0);
@@ -32,10 +31,14 @@ export default function CheckInPage() {
 
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [editingDate, setEditingDate] = useState<string | null>(null);
+  const [editHeW, setEditHeW] = useState("");
+  const [editSheW, setEditSheW] = useState("");
+
   const heFileRef = useRef<HTMLInputElement>(null);
   const sheFileRef = useRef<HTMLInputElement>(null);
 
-  // 下载图片到手机相册
   const downloadImage = (dataUrl: string, filename: string) => {
     const arr = dataUrl.split(",");
     const mime = arr[0].match(/:(.*?);/)?.[1] || "image/jpeg";
@@ -55,7 +58,6 @@ export default function CheckInPage() {
   };
 
   const load = useCallback(() => {
-    // 他
     setHeWeightRecords(data.getWeightRecords("he"));
     setHeStreak(data.getStreak("he"));
     const heCI = data.getCheckInRecords("he");
@@ -66,7 +68,6 @@ export default function CheckInPage() {
     const hw = data.getWeightRecords("he").find((r) => r.date === today);
     if (hw) setHeWeight(hw.weight.toString());
 
-    // 她
     setSheWeightRecords(data.getWeightRecords("she"));
     setSheStreak(data.getStreak("she"));
     const sheCI = data.getCheckInRecords("she");
@@ -105,7 +106,6 @@ export default function CheckInPage() {
     try {
       const dataUrl = await compressImage(file, 200);
       data.addPhotoRecord({ date: today, dataUrl, gender: g });
-      // 自动保存到手机
       const name = g === "he" ? "瑞文" : "发发";
       downloadImage(dataUrl, `${name}_${today}.jpg`);
       load();
@@ -116,7 +116,6 @@ export default function CheckInPage() {
     if (fileRef.current) fileRef.current.value = "";
   };
 
-  // 体重变化
   const getWeightChange = (records: WeightRecord[]) => {
     if (records.length < 2) return null;
     const latest = records[records.length - 1];
@@ -124,32 +123,261 @@ export default function CheckInPage() {
     return latest.weight - prev.weight;
   };
 
+  // 保存修改的历史体重
+  const saveEditWeight = (date: string) => {
+    const heW = parseFloat(editHeW);
+    const sheW = parseFloat(editSheW);
+    if (!isNaN(heW) && heW >= 50 && heW <= 500) {
+      data.addWeightRecord({ date, weight: heW, gender: "he" });
+    }
+    if (!isNaN(sheW) && sheW >= 50 && sheW <= 500) {
+      data.addWeightRecord({ date, weight: sheW, gender: "she" });
+    }
+    setEditingDate(null);
+    load();
+  };
+
   const heLatest = heWeightRecords.length > 0 ? heWeightRecords[heWeightRecords.length - 1] : null;
   const sheLatest = sheWeightRecords.length > 0 ? sheWeightRecords[sheWeightRecords.length - 1] : null;
   const heChange = getWeightChange(heWeightRecords);
   const sheChange = getWeightChange(sheWeightRecords);
-
   const hasAnyWeightData = heWeightRecords.length > 1 || sheWeightRecords.length > 1;
 
   if (!gender) return null;
 
+  // ===== 历史记录视图 =====
+  if (showHistory) {
+    // 合并所有有记录的日期
+    const allDates = new Set<string>();
+    heWeightRecords.forEach((r) => allDates.add(r.date));
+    sheWeightRecords.forEach((r) => allDates.add(r.date));
+    heCheckInRecords.filter((r) => r.checkedIn).forEach((r) => allDates.add(r.date));
+    sheCheckInRecords.filter((r) => r.checkedIn).forEach((r) => allDates.add(r.date));
+
+    const sortedDates = Array.from(allDates).sort().reverse();
+
+    const heWeightMap = new Map(heWeightRecords.map((r) => [r.date, r.weight]));
+    const sheWeightMap = new Map(sheWeightRecords.map((r) => [r.date, r.weight]));
+    const heCheckinSet = new Set(heCheckInRecords.filter((r) => r.checkedIn).map((r) => r.date));
+    const sheCheckinSet = new Set(sheCheckInRecords.filter((r) => r.checkedIn).map((r) => r.date));
+
+    // 计算累计变化
+    const heFirst = heWeightRecords.length > 0 ? heWeightRecords[0].weight : null;
+    const heLast = heLatest?.weight ?? null;
+    const sheFirst = sheWeightRecords.length > 0 ? sheWeightRecords[0].weight : null;
+    const sheLast = sheLatest?.weight ?? null;
+
+    return (
+      <div className="fixed inset-0 z-[100] bg-surface-dark flex flex-col">
+        <div className="flex items-center justify-between px-4 pt-4 pb-2">
+          <button
+            onClick={() => setShowHistory(false)}
+            className="text-white/60 text-sm min-h-touch flex items-center"
+          >
+            ← 返回
+          </button>
+          <h2 className="text-base font-semibold text-white">历史记录</h2>
+          <div className="w-16" />
+        </div>
+
+        {/* 总览统计 */}
+        <div className="px-4 mb-3">
+          <div className="card p-3 flex gap-3">
+            <div className="flex-1 text-center">
+              <div className="text-[10px] text-white/30 mb-1">共记录</div>
+              <div className="text-sm font-semibold text-primary">{sortedDates.length} 天</div>
+            </div>
+            {heFirst !== null && heLast !== null && (
+              <div className="flex-1 text-center">
+                <div className="text-[10px] text-white/30 mb-1">瑞文变化</div>
+                <div className={`text-sm font-semibold ${heLast - heFirst < 0 ? "text-primary" : "text-red-400"}`}>
+                  {heLast - heFirst > 0 ? "+" : ""}{(heLast - heFirst).toFixed(1)} 斤
+                </div>
+              </div>
+            )}
+            {sheFirst !== null && sheLast !== null && (
+              <div className="flex-1 text-center">
+                <div className="text-[10px] text-white/30 mb-1">发发变化</div>
+                <div className={`text-sm font-semibold ${sheLast - sheFirst < 0 ? "text-[#f472b6]" : "text-red-400"}`}>
+                  {sheLast - sheFirst > 0 ? "+" : ""}{(sheLast - sheFirst).toFixed(1)} 斤
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 日期列表 */}
+        <div className="flex-1 overflow-y-auto px-4 pb-6">
+          {sortedDates.length === 0 ? (
+            <div className="text-center text-white/30 text-sm mt-20">
+              还没有打卡记录，今天开始吧！
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {sortedDates.map((date) => {
+                const heW = heWeightMap.get(date);
+                const sheW = sheWeightMap.get(date);
+                const heCI = heCheckinSet.has(date);
+                const sheCI = sheCheckinSet.has(date);
+                const isToday = date === today;
+                const isEditing = editingDate === date;
+
+                return (
+                  <div key={date} className={`card p-3 ${isToday ? "ring-1 ring-primary/30" : ""}`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-white/50 font-mono">
+                          {date.slice(5)}
+                        </span>
+                        {isToday && (
+                          <span className="text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+                            今天
+                          </span>
+                        )}
+                      </div>
+                      {!isEditing && (
+                        <button
+                          onClick={() => {
+                            setEditingDate(date);
+                            setEditHeW(heW?.toString() || "");
+                            setEditSheW(sheW?.toString() || "");
+                          }}
+                          className="text-[10px] text-white/30 min-h-touch flex items-center"
+                        >
+                          修改
+                        </button>
+                      )}
+                    </div>
+
+                    {isEditing ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-[#4ecdc4] flex-shrink-0" />
+                          <span className="text-xs text-white/50 w-8">瑞文</span>
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            step="0.1"
+                            value={editHeW}
+                            onChange={(e) => setEditHeW(e.target.value)}
+                            placeholder="体重"
+                            className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/30 outline-none"
+                          />
+                          <span className="text-[10px] text-white/30">斤</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-[#f472b6] flex-shrink-0" />
+                          <span className="text-xs text-white/50 w-8">发发</span>
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            step="0.1"
+                            value={editSheW}
+                            onChange={(e) => setEditSheW(e.target.value)}
+                            placeholder="体重"
+                            className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/30 outline-none"
+                          />
+                          <span className="text-[10px] text-white/30">斤</span>
+                        </div>
+                        <div className="flex gap-2 mt-1">
+                          <button
+                            onClick={() => saveEditWeight(date)}
+                            className="flex-1 py-2 rounded-lg text-xs bg-primary/15 text-primary min-h-touch"
+                          >
+                            保存
+                          </button>
+                          <button
+                            onClick={() => setEditingDate(null)}
+                            className="flex-1 py-2 rounded-lg text-xs bg-white/5 text-white/40 min-h-touch"
+                          >
+                            取消
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex gap-4">
+                        {/* 瑞文 */}
+                        <div className="flex-1">
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <span className="w-2 h-2 rounded-full bg-[#4ecdc4]" />
+                            <span className="text-[10px] text-white/40">瑞文</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {heCI && (
+                              <span className="text-[10px] text-[#4ecdc4] bg-[#4ecdc4]/10 px-1.5 py-0.5 rounded">
+                                ✓ 签到
+                              </span>
+                            )}
+                            {heW !== undefined && (
+                              <span className="text-xs text-white/70">{heW} 斤</span>
+                            )}
+                            {!heCI && heW === undefined && (
+                              <span className="text-[10px] text-white/20">未记录</span>
+                            )}
+                          </div>
+                        </div>
+                        {/* 发发 */}
+                        <div className="flex-1">
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <span className="w-2 h-2 rounded-full bg-[#f472b6]" />
+                            <span className="text-[10px] text-white/40">发发</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {sheCI && (
+                              <span className="text-[10px] text-[#f472b6] bg-[#f472b6]/10 px-1.5 py-0.5 rounded">
+                                ✓ 签到
+                              </span>
+                            )}
+                            {sheW !== undefined && (
+                              <span className="text-xs text-white/70">{sheW} 斤</span>
+                            )}
+                            {!sheCI && sheW === undefined && (
+                              <span className="text-[10px] text-white/20">未记录</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ===== 主页面 =====
   return (
     <div className="px-4 pt-4">
       {/* 头部 */}
-      <div className="mb-4">
-        <h1 className="text-xl font-bold text-white">打卡记录</h1>
-        <p className="text-xs text-white/40 mt-0.5">一起坚持，见证改变</p>
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h1 className="text-xl font-bold text-white">打卡记录</h1>
+          <p className="text-xs text-white/40 mt-0.5">
+            一起坚持，见证改变
+            {syncStatus && (
+              <span className={`ml-2 ${syncStatus.includes("✓") ? "text-primary/50" : syncStatus.includes("✗") ? "text-red-400/50" : "text-yellow-400/50"}`}>
+                · {syncStatus}
+              </span>
+            )}
+          </p>
+        </div>
+        <button
+          onClick={() => setShowHistory(true)}
+          className="text-xs bg-primary/10 text-primary px-3 py-1.5 rounded-lg active:bg-primary/20 min-h-touch"
+        >
+          历史记录
+        </button>
       </div>
 
       {/* 今日签到 - 双人并排 */}
       <div className="grid grid-cols-2 gap-3 mb-4">
-        {/* 他 */}
         <div className="card p-4 flex flex-col items-center text-center">
           <span className="text-2xl mb-1">👨</span>
           <span className="text-sm font-medium text-white mb-0.5">瑞文</span>
-          <span className="text-xs text-[#4ecdc4] mb-3">
-            连续 {heStreak} 天
-          </span>
+          <span className="text-xs text-[#4ecdc4] mb-3">连续 {heStreak} 天</span>
           <button
             onClick={() => handleCheckIn("he")}
             disabled={heCheckedIn}
@@ -163,13 +391,10 @@ export default function CheckInPage() {
           </button>
         </div>
 
-        {/* 她 */}
         <div className="card p-4 flex flex-col items-center text-center">
           <span className="text-2xl mb-1">👩</span>
           <span className="text-sm font-medium text-white mb-0.5">发发</span>
-          <span className="text-xs text-[#f472b6] mb-3">
-            连续 {sheStreak} 天
-          </span>
+          <span className="text-xs text-[#f472b6] mb-3">连续 {sheStreak} 天</span>
           <button
             onClick={() => handleCheckIn("she")}
             disabled={sheCheckedIn}
@@ -184,14 +409,13 @@ export default function CheckInPage() {
         </div>
       </div>
 
-      {/* 双人打卡状态提示 */}
       {heCheckedIn && sheCheckedIn && (
         <div className="card p-3 mb-4 text-center bg-primary/5 border border-primary/10">
           <span className="text-xs text-primary">🎉 今天两人都完成打卡了！继续加油！</span>
         </div>
       )}
 
-      {/* 体重记录 - 他 */}
+      {/* 体重记录 - 瑞文 */}
       <div className="card p-4 mb-3">
         <div className="flex items-center gap-2 mb-3">
           <span className="w-2 h-2 rounded-full bg-[#4ecdc4]" />
@@ -230,7 +454,7 @@ export default function CheckInPage() {
         )}
       </div>
 
-      {/* 体重记录 - 她 */}
+      {/* 体重记录 - 发发 */}
       <div className="card p-4 mb-4">
         <div className="flex items-center gap-2 mb-3">
           <span className="w-2 h-2 rounded-full bg-[#f472b6]" />
@@ -269,7 +493,7 @@ export default function CheckInPage() {
         )}
       </div>
 
-      {/* 体重趋势图 - 双线 */}
+      {/* 体重趋势图 */}
       {hasAnyWeightData && (
         <div className="card p-4 mb-4">
           <h3 className="text-sm font-semibold text-white mb-3">体重趋势</h3>
@@ -277,27 +501,12 @@ export default function CheckInPage() {
         </div>
       )}
 
-      {/* 照片打卡 - 双人并排 */}
+      {/* 照片打卡 */}
       <div className="card p-4 mb-4">
         <h3 className="text-sm font-semibold text-white mb-3">今日照片</h3>
-        <input
-          ref={heFileRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          onChange={(e) => handlePhotoUpload(e, "he", heFileRef)}
-          className="hidden"
-        />
-        <input
-          ref={sheFileRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          onChange={(e) => handlePhotoUpload(e, "she", sheFileRef)}
-          className="hidden"
-        />
+        <input ref={heFileRef} type="file" accept="image/*" capture="environment" onChange={(e) => handlePhotoUpload(e, "he", heFileRef)} className="hidden" />
+        <input ref={sheFileRef} type="file" accept="image/*" capture="environment" onChange={(e) => handlePhotoUpload(e, "she", sheFileRef)} className="hidden" />
         <div className="grid grid-cols-2 gap-3">
-          {/* 他的照片 */}
           <div>
             <div className="flex items-center gap-1.5 mb-2">
               <span className="w-2 h-2 rounded-full bg-[#4ecdc4]" />
@@ -306,39 +515,18 @@ export default function CheckInPage() {
             {hePhoto ? (
               <div className="relative">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={hePhoto}
-                  alt="瑞文的打卡照片"
-                  className="w-full rounded-xl object-cover aspect-[3/4]"
-                />
+                <img src={hePhoto} alt="瑞文的打卡照片" className="w-full rounded-xl object-cover aspect-[3/4]" />
                 <div className="absolute bottom-2 right-2 flex gap-1">
-                  <button
-                    onClick={() => downloadImage(hePhoto!, `瑞文_${today}.jpg`)}
-                    className="bg-black/60 text-white/80 text-[10px] px-2 py-1 rounded-lg"
-                  >
-                    保存
-                  </button>
-                  <button
-                    onClick={() => heFileRef.current?.click()}
-                    className="bg-black/60 text-white/80 text-[10px] px-2 py-1 rounded-lg"
-                  >
-                    重拍
-                  </button>
+                  <button onClick={() => downloadImage(hePhoto!, `瑞文_${today}.jpg`)} className="bg-black/60 text-white/80 text-[10px] px-2 py-1 rounded-lg">保存</button>
+                  <button onClick={() => heFileRef.current?.click()} className="bg-black/60 text-white/80 text-[10px] px-2 py-1 rounded-lg">重拍</button>
                 </div>
               </div>
             ) : (
-              <button
-                onClick={() => heFileRef.current?.click()}
-                disabled={saving}
-                className="w-full aspect-[3/4] rounded-xl border-2 border-dashed border-white/10 text-white/40 text-xs flex flex-col items-center justify-center gap-1.5 active:bg-white/3"
-              >
-                <span className="text-2xl">📸</span>
-                <span>拍照</span>
+              <button onClick={() => heFileRef.current?.click()} disabled={saving} className="w-full aspect-[3/4] rounded-xl border-2 border-dashed border-white/10 text-white/40 text-xs flex flex-col items-center justify-center gap-1.5 active:bg-white/3">
+                <span className="text-2xl">📸</span><span>拍照</span>
               </button>
             )}
           </div>
-
-          {/* 她的照片 */}
           <div>
             <div className="flex items-center gap-1.5 mb-2">
               <span className="w-2 h-2 rounded-full bg-[#f472b6]" />
@@ -347,47 +535,26 @@ export default function CheckInPage() {
             {shePhoto ? (
               <div className="relative">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={shePhoto}
-                  alt="发发的打卡照片"
-                  className="w-full rounded-xl object-cover aspect-[3/4]"
-                />
+                <img src={shePhoto} alt="发发的打卡照片" className="w-full rounded-xl object-cover aspect-[3/4]" />
                 <div className="absolute bottom-2 right-2 flex gap-1">
-                  <button
-                    onClick={() => downloadImage(shePhoto!, `发发_${today}.jpg`)}
-                    className="bg-black/60 text-white/80 text-[10px] px-2 py-1 rounded-lg"
-                  >
-                    保存
-                  </button>
-                  <button
-                    onClick={() => sheFileRef.current?.click()}
-                    className="bg-black/60 text-white/80 text-[10px] px-2 py-1 rounded-lg"
-                  >
-                    重拍
-                  </button>
+                  <button onClick={() => downloadImage(shePhoto!, `发发_${today}.jpg`)} className="bg-black/60 text-white/80 text-[10px] px-2 py-1 rounded-lg">保存</button>
+                  <button onClick={() => sheFileRef.current?.click()} className="bg-black/60 text-white/80 text-[10px] px-2 py-1 rounded-lg">重拍</button>
                 </div>
               </div>
             ) : (
-              <button
-                onClick={() => sheFileRef.current?.click()}
-                disabled={saving}
-                className="w-full aspect-[3/4] rounded-xl border-2 border-dashed border-white/10 text-white/40 text-xs flex flex-col items-center justify-center gap-1.5 active:bg-white/3"
-              >
-                <span className="text-2xl">📸</span>
-                <span>拍照</span>
+              <button onClick={() => sheFileRef.current?.click()} disabled={saving} className="w-full aspect-[3/4] rounded-xl border-2 border-dashed border-white/10 text-white/40 text-xs flex flex-col items-center justify-center gap-1.5 active:bg-white/3">
+                <span className="text-2xl">📸</span><span>拍照</span>
               </button>
             )}
           </div>
         </div>
       </div>
 
-      {/* 导出全部照片 */}
+      {/* 导出照片 */}
       {(data.getPhotoRecords("he").length > 0 || data.getPhotoRecords("she").length > 0) && (
         <div className="card p-4 mb-4">
           <h3 className="text-sm font-semibold text-white mb-2">导出照片</h3>
-          <p className="text-[10px] text-white/30 mb-3">
-            下载所有打卡照片到手机，方便以后做对比视频
-          </p>
+          <p className="text-[10px] text-white/30 mb-3">下载所有打卡照片到手机，方便做对比视频</p>
           <button
             disabled={exporting}
             onClick={async () => {
@@ -399,29 +566,24 @@ export default function CheckInPage() {
               for (let i = 0; i < allPhotos.length; i++) {
                 const p = allPhotos[i];
                 downloadImage(p.dataUrl, `${p.name}_${p.date}.jpg`);
-                // 间隔 500ms 避免浏览器拦截
-                if (i < allPhotos.length - 1) {
-                  await new Promise((r) => setTimeout(r, 500));
-                }
+                if (i < allPhotos.length - 1) await new Promise((r) => setTimeout(r, 500));
               }
               setExporting(false);
             }}
             className="w-full py-2.5 rounded-xl text-xs font-medium min-h-touch bg-primary/15 text-primary active:bg-primary/25"
           >
-            {exporting
-              ? "正在导出..."
-              : `导出全部照片（${data.getPhotoRecords("he").length + data.getPhotoRecords("she").length} 张）`}
+            {exporting ? "正在导出..." : `导出全部照片（${data.getPhotoRecords("he").length + data.getPhotoRecords("she").length} 张）`}
           </button>
         </div>
       )}
 
-      {/* 打卡日历 - 双色 */}
+      {/* 打卡日历 */}
       <div className="card p-4 mb-4">
         <h3 className="text-sm font-semibold text-white mb-3">打卡日历</h3>
         <CheckInCalendar heRecords={heCheckInRecords} sheRecords={sheCheckInRecords} />
       </div>
 
-      {/* 切换视角（影响饮食/运动页面） */}
+      {/* 切换视角 */}
       <div className="text-center pb-8">
         <p className="text-[10px] text-white/20 mb-1">
           当前饮食/运动页面显示：{gender === "he" ? "👨 瑞文" : "👩 发发"}
