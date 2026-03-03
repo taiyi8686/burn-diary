@@ -1,5 +1,12 @@
 const API_BASE = "https://burn-diary-api.taiyi8686.workers.dev";
 
+// 不需要同步的 key 前缀（user 各自独立，photos 太大）
+const SKIP_SYNC_PREFIXES = ["user", "photos:"];
+
+function shouldSync(key: string): boolean {
+  return !SKIP_SYNC_PREFIXES.some((p) => key.startsWith(p));
+}
+
 async function apiSet(key: string, value: unknown): Promise<void> {
   try {
     await fetch(`${API_BASE}/api/set`, {
@@ -41,18 +48,15 @@ function localSet(key: string, value: unknown): void {
   localStorage.setItem(`${PREFIX}${key}`, JSON.stringify(value));
 }
 
-// 写入：同时写 localStorage 和云端
+// 写入：同时写 localStorage 和云端（跳过不需要同步的数据）
 export async function syncSet(key: string, value: unknown): Promise<void> {
   localSet(key, value);
-  await apiSet(key, value);
+  if (shouldSync(key)) {
+    await apiSet(key, value);
+  }
 }
 
-// 读取：优先从 localStorage 读，后台同步
-export function syncGet<T>(key: string): T | null {
-  return localGet(key) as T | null;
-}
-
-// 从云端拉取所有数据到本地
+// 从云端拉取共享数据到本地
 export async function pullFromCloud(): Promise<boolean> {
   try {
     const items = await apiList("");
@@ -72,7 +76,7 @@ export async function pullFromCloud(): Promise<boolean> {
   }
 }
 
-// 把本地所有数据推到云端
+// 把本地共享数据推到云端（跳过 user 和 photos）
 export async function pushToCloud(): Promise<void> {
   if (typeof window === "undefined") return;
   const items: { key: string; value: unknown }[] = [];
@@ -80,6 +84,7 @@ export async function pushToCloud(): Promise<void> {
     const fullKey = localStorage.key(i);
     if (fullKey && fullKey.startsWith(PREFIX)) {
       const key = fullKey.slice(PREFIX.length);
+      if (!shouldSync(key)) continue;
       const raw = localStorage.getItem(fullKey);
       if (raw) {
         try {

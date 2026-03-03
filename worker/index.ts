@@ -26,12 +26,14 @@ export default {
         return jsonResponse({ key, value: value ? JSON.parse(value) : null });
       }
 
-      // GET /api/list?prefix=xxx — 列出某前缀下所有 key-value
+      // GET /api/list?prefix=xxx — 列出某前缀下所有 key-value（跳过照片等大数据）
       if (request.method === "GET" && path === "/api/list") {
         const prefix = url.searchParams.get("prefix") || "";
+        const SKIP_PREFIXES = ["photos:", "user", "test"];
         const list = await env.BURN_DIARY.list({ prefix });
         const results: { key: string; value: unknown }[] = [];
         for (const k of list.keys) {
+          if (SKIP_PREFIXES.some((sp) => k.name.startsWith(sp))) continue;
           const val = await env.BURN_DIARY.get(k.name);
           results.push({ key: k.name, value: val ? JSON.parse(val) : null });
         }
