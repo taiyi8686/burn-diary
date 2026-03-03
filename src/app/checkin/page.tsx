@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useUserStore } from "@/lib/store";
-import { useData } from "@/lib/DataContext";
+import { useData, useSyncTrigger } from "@/lib/DataContext";
 import { getBeijingDateStr, compressImage } from "@/lib/utils";
 import { WeightRecord, CheckInRecord, Gender } from "@/types";
 import { WeightChart } from "@/components/WeightChart";
@@ -11,6 +11,7 @@ import { CheckInCalendar } from "@/components/CheckInCalendar";
 export default function CheckInPage() {
   const gender = useUserStore((s) => s.gender);
   const data = useData();
+  const syncTrigger = useSyncTrigger();
   const today = getBeijingDateStr();
 
   // 他的数据
@@ -79,7 +80,7 @@ export default function CheckInPage() {
 
   useEffect(() => {
     load();
-  }, [load]);
+  }, [load, syncTrigger]);
 
   const saveWeight = (g: Gender, value: string) => {
     const w = parseFloat(value);

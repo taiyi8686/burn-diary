@@ -1,0 +1,11 @@
+{
+  "name": "burn-diary-api",
+  "main": "index.ts",
+  "compatibility_date": "2024-12-01",
+  "kv_namespaces": [
+    {
+      "binding": "BURN_DIARY",
+      "id": "3121336c57714539a502b105446158d3"
+    }
+  ]
+}

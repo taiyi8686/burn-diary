@@ -10,6 +10,7 @@ import {
   Gender,
 } from "@/types";
 import { getBeijingDateStr } from "./utils";
+import { syncSet } from "./sync";
 
 const PREFIX = "burn-diary:";
 
@@ -31,6 +32,8 @@ function getItem<T>(key: string): T | null {
 function setItem<T>(key: string, value: T): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(getKey(key), JSON.stringify(value));
+  // 同步到云端（异步，不阻塞）
+  syncSet(key, value);
 }
 
 export class LocalDataService implements DataService {
