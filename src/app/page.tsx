@@ -17,6 +17,7 @@ export default function DietPage() {
   const [servings, setServings] = useState<1 | 2>(2);
   const [browsing, setBrowsing] = useState(false);
   const [filterTag, setFilterTag] = useState<string>("全部");
+  const [planCounts, setPlanCounts] = useState<Record<string, number>>({});
 
   const loadSelection = useCallback(() => {
     const saved = data.getDaySelection(today);
@@ -24,6 +25,7 @@ export default function DietPage() {
       setSelectedPlanId(saved.planId);
       setServings(saved.servings);
     }
+    setPlanCounts(data.getPlanUsageCounts());
   }, [data, today]);
 
   useEffect(() => {
@@ -38,6 +40,7 @@ export default function DietPage() {
     const sel: DaySelection = { date: today, planId, servings };
     setSelectedPlanId(planId);
     data.setDaySelection(sel);
+    setPlanCounts(data.getPlanUsageCounts());
     setBrowsing(false);
   };
 
@@ -78,6 +81,9 @@ export default function DietPage() {
       ? DAY_PLANS
       : DAY_PLANS.filter((p) => p.tags.includes(filterTag));
 
+  // 统计数据
+  const triedCount = DAY_PLANS.filter((p) => (planCounts[p.id] || 0) > 0).length;
+
   // ===== 浏览列表 =====
   if (browsing) {
     return (
@@ -90,7 +96,11 @@ export default function DietPage() {
             ← 返回
           </button>
           <h2 className="text-base font-semibold text-white">选择日食谱</h2>
-          <div className="w-16" />
+          <div className="w-16 text-right">
+            <span className="text-[10px] text-white/30">
+              已试 {triedCount}/{DAY_PLANS.length}
+            </span>
+          </div>
         </div>
 
         {/* 标签过滤 */}
@@ -117,6 +127,7 @@ export default function DietPage() {
               const cal = getCal(plan);
               const protein = getProtein(plan);
               const isSelected = plan.id === selectedPlanId;
+              const count = planCounts[plan.id] || 0;
 
               return (
                 <button
@@ -131,14 +142,32 @@ export default function DietPage() {
                       {plan.icon}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-white truncate">
-                        {plan.name}
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-white truncate">
+                          {plan.name}
+                        </span>
+                        {count === 0 && (
+                          <span className="text-[10px] text-yellow-400 bg-yellow-400/10 px-1.5 py-0.5 rounded flex-shrink-0">
+                            新
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-2 mt-1">
                         <span className="text-xs text-primary/70">{cal} 千卡</span>
                         <span className="text-xs text-blue-400/60">
                           蛋白质 {protein}g
                         </span>
+                        {count > 0 && (
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                            count >= 5
+                              ? "text-red-400/70 bg-red-400/10"
+                              : count >= 3
+                              ? "text-orange-400/70 bg-orange-400/10"
+                              : "text-white/30 bg-white/5"
+                          }`}>
+                            吃过{count}次
+                          </span>
+                        )}
                       </div>
                     </div>
                     {isSelected && (

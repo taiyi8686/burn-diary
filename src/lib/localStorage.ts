@@ -160,4 +160,29 @@ export class LocalDataService implements DataService {
 
     return streak;
   }
+
+  // ===== 套餐使用统计 =====
+  getPlanUsageCounts(): Record<string, number> {
+    const counts: Record<string, number> = {};
+    if (typeof window === "undefined") return counts;
+
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(getKey("selection:"))) {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          try {
+            const sel = JSON.parse(raw);
+            if (sel.planId) {
+              counts[sel.planId] = (counts[sel.planId] || 0) + 1;
+            }
+          } catch {
+            // skip
+          }
+        }
+      }
+    }
+
+    return counts;
+  }
 }

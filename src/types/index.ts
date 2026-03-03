@@ -126,4 +126,6 @@ export interface DataService {
   getCheckInRecords(gender: Gender): CheckInRecord[];
   checkIn(r: CheckInRecord): void;
   getStreak(gender: Gender): number;
+
+  getPlanUsageCounts(): Record<string, number>;
 }
