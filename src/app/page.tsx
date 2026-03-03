@@ -53,10 +53,22 @@ export default function DietPage() {
     selectPlan(shuffled[0].id);
   };
 
+  // 数量翻倍：把 "220g" 变成 "440g"，"1个" 变成 "2个"
+  const multiplyAmount = (amount: string, mult: number): string => {
+    if (mult === 1) return amount;
+    const match = amount.match(/^(\d+\.?\d*)(.*)/);
+    if (match) {
+      const num = parseFloat(match[1]) * mult;
+      const unit = match[2];
+      return `${num % 1 === 0 ? num : num.toFixed(1)}${unit}`;
+    }
+    return `${amount} ×${mult}`;
+  };
+
   const getCal = (plan: DayPlan) =>
-    gender === "he" ? plan.totalCaloriesHe : plan.totalCaloriesShe;
+    (gender === "he" ? plan.totalCaloriesHe : plan.totalCaloriesShe) * servings;
   const getProtein = (plan: DayPlan) =>
-    gender === "he" ? plan.totalProteinHe : plan.totalProteinShe;
+    (gender === "he" ? plan.totalProteinHe : plan.totalProteinShe) * servings;
 
   // 所有标签
   const allTags = ["全部", ...Array.from(new Set(DAY_PLANS.flatMap((p) => p.tags)))];
@@ -281,8 +293,8 @@ export default function DietPage() {
               { label: "晚餐", meal: selectedPlan.dinner },
               { label: "加餐", meal: selectedPlan.snack },
             ].map(({ label, meal }) => {
-              const mealCal = gender === "he" ? meal.caloriesHe : meal.caloriesShe;
-              const mealProtein = gender === "he" ? meal.proteinHe : meal.proteinShe;
+              const mealCal = (gender === "he" ? meal.caloriesHe : meal.caloriesShe) * servings;
+              const mealProtein = (gender === "he" ? meal.proteinHe : meal.proteinShe) * servings;
 
               return (
                 <div key={label} className="card overflow-hidden">
@@ -314,18 +326,20 @@ export default function DietPage() {
 
                     {/* 食材列表 */}
                     <div className="mt-3 space-y-1">
-                      {meal.items.map((item, idx) => (
-                        <div
-                          key={idx}
-                          className="flex justify-between text-xs py-0.5 border-t border-white/5 first:border-0"
-                        >
-                          <span className="text-white/60">{item.name}</span>
-                          <span className="text-white/30">
-                            {gender === "he" ? item.amountHe : item.amountShe}
-                            {servings === 2 && " ×2"}
-                          </span>
-                        </div>
-                      ))}
+                      {meal.items.map((item, idx) => {
+                        const baseAmount = gender === "he" ? item.amountHe : item.amountShe;
+                        return (
+                          <div
+                            key={idx}
+                            className="flex justify-between text-xs py-0.5 border-t border-white/5 first:border-0"
+                          >
+                            <span className="text-white/60">{item.name}</span>
+                            <span className="text-white/30">
+                              {multiplyAmount(baseAmount, servings)}
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
