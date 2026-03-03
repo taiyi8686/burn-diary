@@ -30,8 +30,28 @@ export default function CheckInPage() {
   const [sheCheckInRecords, setSheCheckInRecords] = useState<CheckInRecord[]>([]);
 
   const [saving, setSaving] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const heFileRef = useRef<HTMLInputElement>(null);
   const sheFileRef = useRef<HTMLInputElement>(null);
+
+  // 下载图片到手机相册
+  const downloadImage = (dataUrl: string, filename: string) => {
+    const arr = dataUrl.split(",");
+    const mime = arr[0].match(/:(.*?);/)?.[1] || "image/jpeg";
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) u8arr[n] = bstr.charCodeAt(n);
+    const blob = new Blob([u8arr], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   const load = useCallback(() => {
     // 他
@@ -84,6 +104,9 @@ export default function CheckInPage() {
     try {
       const dataUrl = await compressImage(file, 200);
       data.addPhotoRecord({ date: today, dataUrl, gender: g });
+      // 自动保存到手机
+      const name = g === "he" ? "瑞文" : "发发";
+      downloadImage(dataUrl, `${name}_${today}.jpg`);
       load();
     } catch (err) {
       console.error("Photo compression failed:", err);
@@ -287,12 +310,20 @@ export default function CheckInPage() {
                   alt="瑞文的打卡照片"
                   className="w-full rounded-xl object-cover aspect-[3/4]"
                 />
-                <button
-                  onClick={() => heFileRef.current?.click()}
-                  className="absolute bottom-2 right-2 bg-black/60 text-white/80 text-[10px] px-2 py-1 rounded-lg"
-                >
-                  重拍
-                </button>
+                <div className="absolute bottom-2 right-2 flex gap-1">
+                  <button
+                    onClick={() => downloadImage(hePhoto!, `瑞文_${today}.jpg`)}
+                    className="bg-black/60 text-white/80 text-[10px] px-2 py-1 rounded-lg"
+                  >
+                    保存
+                  </button>
+                  <button
+                    onClick={() => heFileRef.current?.click()}
+                    className="bg-black/60 text-white/80 text-[10px] px-2 py-1 rounded-lg"
+                  >
+                    重拍
+                  </button>
+                </div>
               </div>
             ) : (
               <button
@@ -320,12 +351,20 @@ export default function CheckInPage() {
                   alt="发发的打卡照片"
                   className="w-full rounded-xl object-cover aspect-[3/4]"
                 />
-                <button
-                  onClick={() => sheFileRef.current?.click()}
-                  className="absolute bottom-2 right-2 bg-black/60 text-white/80 text-[10px] px-2 py-1 rounded-lg"
-                >
-                  重拍
-                </button>
+                <div className="absolute bottom-2 right-2 flex gap-1">
+                  <button
+                    onClick={() => downloadImage(shePhoto!, `发发_${today}.jpg`)}
+                    className="bg-black/60 text-white/80 text-[10px] px-2 py-1 rounded-lg"
+                  >
+                    保存
+                  </button>
+                  <button
+                    onClick={() => sheFileRef.current?.click()}
+                    className="bg-black/60 text-white/80 text-[10px] px-2 py-1 rounded-lg"
+                  >
+                    重拍
+                  </button>
+                </div>
               </div>
             ) : (
               <button
@@ -340,6 +379,40 @@ export default function CheckInPage() {
           </div>
         </div>
       </div>
+
+      {/* 导出全部照片 */}
+      {(data.getPhotoRecords("he").length > 0 || data.getPhotoRecords("she").length > 0) && (
+        <div className="card p-4 mb-4">
+          <h3 className="text-sm font-semibold text-white mb-2">导出照片</h3>
+          <p className="text-[10px] text-white/30 mb-3">
+            下载所有打卡照片到手机，方便以后做对比视频
+          </p>
+          <button
+            disabled={exporting}
+            onClick={async () => {
+              setExporting(true);
+              const allPhotos = [
+                ...data.getPhotoRecords("he").map((p) => ({ ...p, name: "瑞文" })),
+                ...data.getPhotoRecords("she").map((p) => ({ ...p, name: "发发" })),
+              ].sort((a, b) => a.date.localeCompare(b.date));
+              for (let i = 0; i < allPhotos.length; i++) {
+                const p = allPhotos[i];
+                downloadImage(p.dataUrl, `${p.name}_${p.date}.jpg`);
+                // 间隔 500ms 避免浏览器拦截
+                if (i < allPhotos.length - 1) {
+                  await new Promise((r) => setTimeout(r, 500));
+                }
+              }
+              setExporting(false);
+            }}
+            className="w-full py-2.5 rounded-xl text-xs font-medium min-h-touch bg-primary/15 text-primary active:bg-primary/25"
+          >
+            {exporting
+              ? "正在导出..."
+              : `导出全部照片（${data.getPhotoRecords("he").length + data.getPhotoRecords("she").length} 张）`}
+          </button>
+        </div>
+      )}
 
       {/* 打卡日历 - 双色 */}
       <div className="card p-4 mb-4">
