@@ -71,6 +71,9 @@ export interface Exercise {
   time: string;
   description: string;
   icon: string;
+  forGender?: "both" | "he" | "she";
+  sets?: number;
+  reps?: string;
 }
 
 export interface ExerciseCompletion {
