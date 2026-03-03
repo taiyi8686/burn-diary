@@ -1,101 +1,95 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import React, { useState, useEffect, useCallback } from "react";
+import { useUserStore } from "@/lib/store";
+import { useData } from "@/lib/DataContext";
+import { getBeijingDateStr, getDayType } from "@/lib/utils";
+import { MENU_DATA } from "@/data/meals";
+import { MealCompletion } from "@/types";
+import { DatePicker } from "@/components/DatePicker";
+import { FastingIndicator } from "@/components/FastingIndicator";
+import { MealCard } from "@/components/MealCard";
+
+export default function DietPage() {
+  const gender = useUserStore((s) => s.gender);
+  const data = useData();
+  const [selectedDate, setSelectedDate] = useState(getBeijingDateStr());
+  const [completions, setCompletions] = useState<MealCompletion[]>([]);
+  const [, setTick] = useState(0);
+
+  const dayType = getDayType(selectedDate);
+  const menu = MENU_DATA.find((m) => m.day === dayType)!;
+
+  const loadCompletions = useCallback(() => {
+    setCompletions(data.getMealCompletions(selectedDate));
+  }, [data, selectedDate]);
+
+  useEffect(() => {
+    loadCompletions();
+  }, [loadCompletions]);
+
+  // 每分钟刷新断食状态
+  useEffect(() => {
+    const timer = setInterval(() => setTick((t) => t + 1), 60000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const toggleMeal = (mealId: string) => {
+    const existing = completions.find((c) => c.mealId === mealId);
+    const newCompletion: MealCompletion = {
+      date: selectedDate,
+      mealId,
+      completed: !existing?.completed,
+    };
+    data.setMealCompletion(newCompletion);
+    loadCompletions();
+  };
+
+  const completedCount = completions.filter((c) => c.completed).length;
+
+  if (!gender) return null;
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+    <div className="px-4 pt-4">
+      {/* 头部 */}
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h1 className="text-xl font-bold text-white">饮食计划</h1>
+          <p className="text-xs text-white/40 mt-0.5">
+            {menu.label} · 目标 {menu.totalCalories[gender]} 千卡
+          </p>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+        <div className="text-right">
+          <div className="text-sm text-white/60">已完成</div>
+          <div className="text-lg font-bold text-primary">
+            {completedCount}/{menu.meals.length}
+          </div>
+        </div>
+      </div>
+
+      {/* 日期选择器 */}
+      <DatePicker selected={selectedDate} onSelect={setSelectedDate} />
+
+      {/* 断食状态 */}
+      <FastingIndicator />
+
+      {/* 餐食卡片列表 */}
+      <div className="space-y-3 mt-4 pb-4">
+        {menu.meals.map((meal) => {
+          const isCompleted = completions.find(
+            (c) => c.mealId === meal.id
+          )?.completed;
+          return (
+            <MealCard
+              key={meal.id}
+              meal={meal}
+              gender={gender}
+              completed={!!isCompleted}
+              onToggle={() => toggleMeal(meal.id)}
+            />
+          );
+        })}
+      </div>
     </div>
   );
 }
