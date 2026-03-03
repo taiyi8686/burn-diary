@@ -1,4 +1,5 @@
-const API_BASE = "https://burn-diary-api.taiyi8686.workers.dev";
+// 同域名 API，不再访问 workers.dev（在中国被封）
+const API_BASE = "";
 
 // 不需要同步的 key 前缀（user 各自独立，photos 太大）
 const SKIP_SYNC_PREFIXES = ["user", "photos:"];
@@ -7,9 +8,16 @@ function shouldSync(key: string): boolean {
   return !SKIP_SYNC_PREFIXES.some((p) => key.startsWith(p));
 }
 
+// 带超时的 fetch，防止请求卡住
+function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 8000): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timer));
+}
+
 async function apiSet(key: string, value: unknown): Promise<void> {
   try {
-    await fetch(`${API_BASE}/api/set`, {
+    await fetchWithTimeout(`${API_BASE}/api/set`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ key, value }),
@@ -21,7 +29,7 @@ async function apiSet(key: string, value: unknown): Promise<void> {
 
 async function apiList(prefix: string): Promise<{ key: string; value: unknown }[]> {
   try {
-    const res = await fetch(`${API_BASE}/api/list?prefix=${encodeURIComponent(prefix)}`);
+    const res = await fetchWithTimeout(`${API_BASE}/api/list?prefix=${encodeURIComponent(prefix)}`);
     const data = await res.json();
     return data.items || [];
   } catch {
@@ -97,7 +105,7 @@ export async function pushToCloud(): Promise<void> {
   }
   if (items.length === 0) return;
   try {
-    await fetch(`${API_BASE}/api/batch`, {
+    await fetchWithTimeout(`${API_BASE}/api/batch`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ items }),
