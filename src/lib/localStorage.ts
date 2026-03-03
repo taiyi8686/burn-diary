@@ -1,7 +1,7 @@
 import {
   DataService,
   UserProfile,
-  MealCompletion,
+  DayMealSelection,
   ShoppingList,
   ExerciseCompletion,
   WeightRecord,
@@ -9,7 +9,6 @@ import {
   CheckInRecord,
   Gender,
 } from "@/types";
-import { SHOPPING_DATA } from "@/data/shopping";
 import { getBeijingDateStr } from "./utils";
 
 const PREFIX = "burn-diary:";
@@ -44,33 +43,18 @@ export class LocalDataService implements DataService {
     setItem("user", user);
   }
 
-  // ===== 餐次完成 =====
-  getMealCompletions(date: string): MealCompletion[] {
-    return getItem<MealCompletion[]>(`meals:${date}`) || [];
+  // ===== 每日选菜 =====
+  getDaySelection(date: string): DayMealSelection | null {
+    return getItem<DayMealSelection>(`selection:${date}`);
   }
 
-  setMealCompletion(completion: MealCompletion): void {
-    const completions = this.getMealCompletions(completion.date);
-    const idx = completions.findIndex((c) => c.mealId === completion.mealId);
-    if (idx >= 0) {
-      completions[idx] = completion;
-    } else {
-      completions.push(completion);
-    }
-    setItem(`meals:${completion.date}`, completions);
+  setDaySelection(selection: DayMealSelection): void {
+    setItem(`selection:${selection.date}`, selection);
   }
 
   // ===== 采购清单（共享）=====
-  getShoppingList(): ShoppingList {
-    const saved = getItem<ShoppingList>("shopping");
-    if (saved) return saved;
-    // 初始化
-    const initial: ShoppingList = {
-      items: SHOPPING_DATA.map((item) => ({ ...item, checked: false })),
-      lastReset: new Date().toISOString(),
-    };
-    setItem("shopping", initial);
-    return initial;
+  getShoppingList(): ShoppingList | null {
+    return getItem<ShoppingList>("shopping");
   }
 
   setShoppingList(list: ShoppingList): void {
@@ -79,18 +63,12 @@ export class LocalDataService implements DataService {
 
   toggleShoppingItem(itemId: string): void {
     const list = this.getShoppingList();
+    if (!list) return;
     const item = list.items.find((i) => i.id === itemId);
     if (item) {
       item.checked = !item.checked;
       this.setShoppingList(list);
     }
-  }
-
-  resetShoppingList(): void {
-    const list = this.getShoppingList();
-    list.items.forEach((item) => (item.checked = false));
-    list.lastReset = new Date().toISOString();
-    this.setShoppingList(list);
   }
 
   // ===== 运动完成 =====
@@ -117,7 +95,6 @@ export class LocalDataService implements DataService {
 
   addWeightRecord(record: WeightRecord): void {
     const records = this.getWeightRecords(record.gender);
-    // 同一天覆盖
     const idx = records.findIndex((r) => r.date === record.date);
     if (idx >= 0) {
       records[idx] = record;
@@ -135,7 +112,6 @@ export class LocalDataService implements DataService {
 
   addPhotoRecord(record: PhotoRecord): void {
     const records = this.getPhotoRecords(record.gender);
-    // 同一天覆盖
     const idx = records.findIndex((r) => r.date === record.date);
     if (idx >= 0) {
       records[idx] = record;
@@ -170,12 +146,10 @@ export class LocalDataService implements DataService {
     let streak = 0;
     let checkDate = today;
 
-    // 从今天开始往回数
     for (let i = 0; i < 365; i++) {
       const found = records.find((r) => r.date === checkDate);
       if (found) {
         streak++;
-        // 往前一天
         const d = new Date(checkDate);
         d.setDate(d.getDate() - 1);
         checkDate = d.toISOString().split("T")[0];

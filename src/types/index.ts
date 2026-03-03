@@ -6,37 +6,46 @@ export interface UserProfile {
   createdAt: string; // ISO date
 }
 
-// ===== 饮食相关 =====
-export interface MealItem {
+// ===== 菜谱相关 =====
+export type MealSlot = "lunch" | "dinner" | "snack";
+
+export interface RecipeIngredient {
   name: string;
-  amount: { he: string; she: string };
-  calories: { he: number; she: number };
-  unit?: string;
+  amountHe: string;  // 男生用量
+  amountShe: string; // 女生用量
+  category: string;  // 采购分类: "肉类", "主食", "蔬菜", "水果", "乳品", "调料"
 }
 
-export interface Meal {
+export interface Recipe {
   id: string;
-  type: "breakfast" | "lunch" | "dinner" | "snack";
-  label: string;
-  time: string; // 如 "11:00"
-  items: MealItem[];
+  name: string;
+  icon: string;        // emoji
+  mealSlot: MealSlot;
+  category: string;    // "鸡肉类", "鱼虾类", "牛肉类", "综合", "轻食", "汤类"
+  caloriesHe: number;
+  caloriesShe: number;
+  proteinHe: number;   // 克
+  proteinShe: number;
+  carbsHe: number;
+  carbsShe: number;
+  fatHe: number;
+  fatShe: number;
+  ingredients: RecipeIngredient[];
+  steps: string;       // 简要做法
+  tags: string[];      // "高蛋白", "低脂", "快手", "不用开火"
 }
 
-export interface DayMenu {
-  day: 1 | 2;
-  label: string;
-  meals: Meal[];
-  totalCalories: { he: number; she: number };
+// ===== 每日选菜 =====
+export interface DayMealSelection {
+  date: string;           // YYYY-MM-DD
+  lunchId: string | null;
+  dinnerId: string | null;
+  snackId: string | null;
 }
 
-// ===== 餐次完成状态 =====
-export interface MealCompletion {
-  date: string; // YYYY-MM-DD
-  mealId: string;
-  completed: boolean;
-}
+// ===== 采购清单 (动态生成) =====
+export type ShoppingDuration = "one-meal" | "one-day" | "two-days";
 
-// ===== 采购清单 =====
 export interface ShoppingItem {
   id: string;
   name: string;
@@ -47,7 +56,9 @@ export interface ShoppingItem {
 
 export interface ShoppingList {
   items: ShoppingItem[];
-  lastReset: string; // ISO date
+  duration: ShoppingDuration;
+  generatedFrom: string[]; // recipe IDs
+  lastGenerated: string;   // ISO date
 }
 
 // ===== 运动相关 =====
@@ -86,21 +97,26 @@ export interface CheckInRecord {
   checkedIn: boolean;
 }
 
+// ===== 每日热量目标 =====
+export const CALORIE_TARGETS = {
+  he: { min: 1500, max: 1700, lunch: { min: 550, max: 750 }, dinner: { min: 400, max: 600 }, snack: { min: 150, max: 250 } },
+  she: { min: 1100, max: 1300, lunch: { min: 400, max: 550 }, dinner: { min: 300, max: 450 }, snack: { min: 100, max: 200 } },
+} as const;
+
 // ===== 数据服务接口 =====
 export interface DataService {
   // 用户
   getUser(): UserProfile | null;
   setUser(user: UserProfile): void;
 
-  // 餐次完成
-  getMealCompletions(date: string): MealCompletion[];
-  setMealCompletion(completion: MealCompletion): void;
+  // 每日选菜
+  getDaySelection(date: string): DayMealSelection | null;
+  setDaySelection(selection: DayMealSelection): void;
 
   // 采购清单（共享）
-  getShoppingList(): ShoppingList;
+  getShoppingList(): ShoppingList | null;
   setShoppingList(list: ShoppingList): void;
   toggleShoppingItem(itemId: string): void;
-  resetShoppingList(): void;
 
   // 运动完成
   getExerciseCompletions(date: string, gender: Gender): ExerciseCompletion[];
