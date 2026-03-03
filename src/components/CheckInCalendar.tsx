@@ -1,26 +1,20 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, subMonths, addMonths } from "date-fns";
 import { zhCN } from "date-fns/locale";
-import { useData } from "@/lib/DataContext";
-import { Gender, CheckInRecord } from "@/types";
+import { CheckInRecord } from "@/types";
 import { getBeijingDateStr } from "@/lib/utils";
 
 interface CheckInCalendarProps {
-  gender: Gender;
+  heRecords: CheckInRecord[];
+  sheRecords: CheckInRecord[];
 }
 
 const WEEKDAYS = ["日", "一", "二", "三", "四", "五", "六"];
 
-export function CheckInCalendar({ gender }: CheckInCalendarProps) {
-  const data = useData();
+export function CheckInCalendar({ heRecords, sheRecords }: CheckInCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [records, setRecords] = useState<CheckInRecord[]>([]);
-
-  useEffect(() => {
-    setRecords(data.getCheckInRecords(gender));
-  }, [data, gender]);
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
@@ -28,12 +22,25 @@ export function CheckInCalendar({ gender }: CheckInCalendarProps) {
   const startDayOfWeek = getDay(monthStart);
   const today = getBeijingDateStr();
 
-  const checkedDates = new Set(
-    records.filter((r) => r.checkedIn).map((r) => r.date)
+  const heCheckedDates = new Set(
+    heRecords.filter((r) => r.checkedIn).map((r) => r.date)
+  );
+  const sheCheckedDates = new Set(
+    sheRecords.filter((r) => r.checkedIn).map((r) => r.date)
   );
 
   return (
     <div>
+      {/* 图例 */}
+      <div className="flex items-center gap-4 mb-3">
+        <span className="flex items-center gap-1 text-[10px] text-white/40">
+          <span className="w-2 h-2 rounded-full bg-[#4ecdc4]" /> 他
+        </span>
+        <span className="flex items-center gap-1 text-[10px] text-white/40">
+          <span className="w-2 h-2 rounded-full bg-[#f472b6]" /> 她
+        </span>
+      </div>
+
       {/* 月份导航 */}
       <div className="flex items-center justify-between mb-3">
         <button
@@ -64,28 +71,45 @@ export function CheckInCalendar({ gender }: CheckInCalendarProps) {
 
       {/* 日期格子 */}
       <div className="grid grid-cols-7 gap-1">
-        {/* 空白填充 */}
         {Array.from({ length: startDayOfWeek }).map((_, i) => (
           <div key={`empty-${i}`} />
         ))}
 
         {days.map((day) => {
           const dateStr = format(day, "yyyy-MM-dd");
-          const isChecked = checkedDates.has(dateStr);
+          const heChecked = heCheckedDates.has(dateStr);
+          const sheChecked = sheCheckedDates.has(dateStr);
           const isToday = dateStr === today;
+          const bothChecked = heChecked && sheChecked;
 
           return (
             <div
               key={dateStr}
-              className={`aspect-square flex items-center justify-center rounded-lg text-xs relative ${
+              className={`aspect-square flex flex-col items-center justify-center rounded-lg text-xs relative ${
                 isToday ? "border border-primary/30" : ""
               }`}
             >
-              <span className={isChecked ? "text-primary font-semibold" : "text-white/40"}>
+              <span
+                className={`${
+                  bothChecked
+                    ? "text-primary font-semibold"
+                    : heChecked || sheChecked
+                    ? "text-white/70 font-medium"
+                    : "text-white/40"
+                }`}
+              >
                 {day.getDate()}
               </span>
-              {isChecked && (
-                <div className="absolute bottom-0.5 w-1 h-1 rounded-full bg-primary" />
+              {/* 打卡点 */}
+              {(heChecked || sheChecked) && (
+                <div className="flex gap-0.5 mt-0.5">
+                  {heChecked && (
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#4ecdc4]" />
+                  )}
+                  {sheChecked && (
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#f472b6]" />
+                  )}
+                </div>
               )}
             </div>
           );
