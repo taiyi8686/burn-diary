@@ -122,7 +122,7 @@ export default function CheckInPage() {
         {/* 他 */}
         <div className="card p-4 flex flex-col items-center text-center">
           <span className="text-2xl mb-1">👨</span>
-          <span className="text-sm font-medium text-white mb-0.5">他</span>
+          <span className="text-sm font-medium text-white mb-0.5">瑞文</span>
           <span className="text-xs text-[#4ecdc4] mb-3">
             连续 {heStreak} 天
           </span>
@@ -142,7 +142,7 @@ export default function CheckInPage() {
         {/* 她 */}
         <div className="card p-4 flex flex-col items-center text-center">
           <span className="text-2xl mb-1">👩</span>
-          <span className="text-sm font-medium text-white mb-0.5">她</span>
+          <span className="text-sm font-medium text-white mb-0.5">发发</span>
           <span className="text-xs text-[#f472b6] mb-3">
             连续 {sheStreak} 天
           </span>
@@ -171,7 +171,7 @@ export default function CheckInPage() {
       <div className="card p-4 mb-3">
         <div className="flex items-center gap-2 mb-3">
           <span className="w-2 h-2 rounded-full bg-[#4ecdc4]" />
-          <h3 className="text-sm font-semibold text-white">他的体重</h3>
+          <h3 className="text-sm font-semibold text-white">瑞文的体重</h3>
         </div>
         <div className="flex gap-2">
           <div className="flex-1 relative">
@@ -210,7 +210,7 @@ export default function CheckInPage() {
       <div className="card p-4 mb-4">
         <div className="flex items-center gap-2 mb-3">
           <span className="w-2 h-2 rounded-full bg-[#f472b6]" />
-          <h3 className="text-sm font-semibold text-white">她的体重</h3>
+          <h3 className="text-sm font-semibold text-white">发发的体重</h3>
         </div>
         <div className="flex gap-2">
           <div className="flex-1 relative">
@@ -277,14 +277,14 @@ export default function CheckInPage() {
           <div>
             <div className="flex items-center gap-1.5 mb-2">
               <span className="w-2 h-2 rounded-full bg-[#4ecdc4]" />
-              <span className="text-xs text-white/50">他</span>
+              <span className="text-xs text-white/50">瑞文</span>
             </div>
             {hePhoto ? (
               <div className="relative">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={hePhoto}
-                  alt="他的打卡照片"
+                  alt="瑞文的打卡照片"
                   className="w-full rounded-xl object-cover aspect-[3/4]"
                 />
                 <button
@@ -310,14 +310,14 @@ export default function CheckInPage() {
           <div>
             <div className="flex items-center gap-1.5 mb-2">
               <span className="w-2 h-2 rounded-full bg-[#f472b6]" />
-              <span className="text-xs text-white/50">她</span>
+              <span className="text-xs text-white/50">发发</span>
             </div>
             {shePhoto ? (
               <div className="relative">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={shePhoto}
-                  alt="她的打卡照片"
+                  alt="发发的打卡照片"
                   className="w-full rounded-xl object-cover aspect-[3/4]"
                 />
                 <button
@@ -350,7 +350,7 @@ export default function CheckInPage() {
       {/* 切换视角（影响饮食/运动页面） */}
       <div className="text-center pb-8">
         <p className="text-[10px] text-white/20 mb-1">
-          当前饮食/运动页面显示：{gender === "he" ? "👨 他" : "👩 她"}
+          当前饮食/运动页面显示：{gender === "he" ? "👨 瑞文" : "👩 发发"}
         </p>
         <button
           onClick={() => {
@@ -360,7 +360,7 @@ export default function CheckInPage() {
           }}
           className="text-xs text-white/30 underline underline-offset-2 min-h-touch"
         >
-          切换到{gender === "he" ? "她" : "他"}的饮食/运动视角
+          切换到{gender === "he" ? "发发" : "瑞文"}的饮食/运动视角
         </button>
       </div>
     </div>

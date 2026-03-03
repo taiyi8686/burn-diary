@@ -50,12 +50,12 @@ export function WeightChart({ heRecords, sheRecords }: WeightChartProps) {
       <div className="flex items-center gap-4 mb-2">
         {hasHe && (
           <span className="flex items-center gap-1 text-[10px] text-white/40">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#4ecdc4]" /> 他
+            <span className="w-2.5 h-2.5 rounded-full bg-[#4ecdc4]" /> 瑞文
           </span>
         )}
         {hasShe && (
           <span className="flex items-center gap-1 text-[10px] text-white/40">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#f472b6]" /> 她
+            <span className="w-2.5 h-2.5 rounded-full bg-[#f472b6]" /> 发发
           </span>
         )}
       </div>
@@ -98,7 +98,7 @@ export function WeightChart({ heRecords, sheRecords }: WeightChartProps) {
               labelStyle={{ color: "rgba(255,255,255,0.6)" }}
               formatter={(value, name) => [
                 `${value} 斤`,
-                name === "he" ? "👨 他" : "👩 她",
+                name === "he" ? "👨 瑞文" : "👩 发发",
               ]}
             />
             {hasHe && (

@@ -32,8 +32,8 @@ export function UserSelect() {
             👨
           </div>
           <div className="text-left">
-            <div className="text-lg font-semibold text-white">他</div>
-            <div className="text-sm text-white/40">男生版饮食计划</div>
+            <div className="text-lg font-semibold text-white">瑞文</div>
+            <div className="text-sm text-white/40">瑞文的饮食运动计划</div>
           </div>
         </button>
 
@@ -45,8 +45,8 @@ export function UserSelect() {
             👩
           </div>
           <div className="text-left">
-            <div className="text-lg font-semibold text-white">她</div>
-            <div className="text-sm text-white/40">女生版饮食计划</div>
+            <div className="text-lg font-semibold text-white">发发</div>
+            <div className="text-sm text-white/40">发发的饮食运动计划</div>
           </div>
         </button>
       </div>

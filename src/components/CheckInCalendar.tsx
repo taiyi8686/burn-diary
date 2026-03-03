@@ -34,10 +34,10 @@ export function CheckInCalendar({ heRecords, sheRecords }: CheckInCalendarProps)
       {/* 图例 */}
       <div className="flex items-center gap-4 mb-3">
         <span className="flex items-center gap-1 text-[10px] text-white/40">
-          <span className="w-2 h-2 rounded-full bg-[#4ecdc4]" /> 他
+          <span className="w-2 h-2 rounded-full bg-[#4ecdc4]" /> 瑞文
         </span>
         <span className="flex items-center gap-1 text-[10px] text-white/40">
-          <span className="w-2 h-2 rounded-full bg-[#f472b6]" /> 她
+          <span className="w-2 h-2 rounded-full bg-[#f472b6]" /> 发发
         </span>
       </div>
 
