@@ -3,49 +3,51 @@ export type Gender = "he" | "she";
 
 export interface UserProfile {
   gender: Gender;
-  createdAt: string; // ISO date
+  createdAt: string;
 }
 
-// ===== 菜谱相关 =====
-export type MealSlot = "lunch" | "dinner" | "snack";
-
-export interface RecipeIngredient {
+// ===== 日食谱 =====
+export interface PlanItem {
   name: string;
-  amountHe: string;  // 男生用量
-  amountShe: string; // 女生用量
-  category: string;  // 采购分类: "肉类", "主食", "蔬菜", "水果", "乳品", "调料"
+  amountHe: string;
+  amountShe: string;
+  category: string; // 采购分类 "🥩 肉类" "🍚 主食" "🥬 蔬菜" "🍎 水果" "🧈 调料"
 }
 
-export interface Recipe {
-  id: string;
+export interface PlanMeal {
   name: string;
-  icon: string;        // emoji
-  mealSlot: MealSlot;
-  category: string;    // "鸡肉类", "鱼虾类", "牛肉类", "综合", "轻食", "汤类"
+  icon: string;
+  time: string;
   caloriesHe: number;
   caloriesShe: number;
-  proteinHe: number;   // 克
+  proteinHe: number;
   proteinShe: number;
-  carbsHe: number;
-  carbsShe: number;
-  fatHe: number;
-  fatShe: number;
-  ingredients: RecipeIngredient[];
-  steps: string;       // 简要做法
-  tags: string[];      // "高蛋白", "低脂", "快手", "不用开火"
+  items: PlanItem[];
+  steps: string;
 }
 
-// ===== 每日选菜 =====
-export interface DayMealSelection {
-  date: string;           // YYYY-MM-DD
-  lunchId: string | null;
-  dinnerId: string | null;
-  snackId: string | null;
+export interface DayPlan {
+  id: string;
+  name: string;
+  icon: string;
+  tags: string[];
+  lunch: PlanMeal;
+  dinner: PlanMeal;
+  snack: PlanMeal;
+  totalCaloriesHe: number;
+  totalCaloriesShe: number;
+  totalProteinHe: number;
+  totalProteinShe: number;
 }
 
-// ===== 采购清单 (动态生成) =====
-export type ShoppingDuration = "one-meal" | "one-day" | "two-days";
+// ===== 今日选择 =====
+export interface DaySelection {
+  date: string;
+  planId: string;
+  servings: 1 | 2; // 1人份 or 2人份
+}
 
+// ===== 采购清单 =====
 export interface ShoppingItem {
   id: string;
   name: string;
@@ -56,82 +58,69 @@ export interface ShoppingItem {
 
 export interface ShoppingList {
   items: ShoppingItem[];
-  duration: ShoppingDuration;
-  generatedFrom: string[]; // recipe IDs
-  lastGenerated: string;   // ISO date
+  planId: string;
+  servings: number;
+  lastGenerated: string;
 }
 
 // ===== 运动相关 =====
 export interface Exercise {
   id: string;
   name: string;
-  duration: number; // 分钟
-  time: string; // 建议时间
+  duration: number;
+  time: string;
   description: string;
   icon: string;
 }
 
 export interface ExerciseCompletion {
-  date: string; // YYYY-MM-DD
+  date: string;
   exerciseId: string;
   completed: boolean;
-  actualDuration?: number; // 实际完成秒数
+  actualDuration?: number;
 }
 
 // ===== 打卡相关 =====
 export interface WeightRecord {
-  date: string; // YYYY-MM-DD
-  weight: number; // 斤
+  date: string;
+  weight: number;
   gender: Gender;
 }
 
 export interface PhotoRecord {
-  date: string; // YYYY-MM-DD
-  dataUrl: string; // base64 图片
+  date: string;
+  dataUrl: string;
   gender: Gender;
 }
 
 export interface CheckInRecord {
-  date: string; // YYYY-MM-DD
+  date: string;
   gender: Gender;
   checkedIn: boolean;
 }
 
-// ===== 每日热量目标 =====
-export const CALORIE_TARGETS = {
-  he: { min: 1500, max: 1700, lunch: { min: 550, max: 750 }, dinner: { min: 400, max: 600 }, snack: { min: 150, max: 250 } },
-  she: { min: 1100, max: 1300, lunch: { min: 400, max: 550 }, dinner: { min: 300, max: 450 }, snack: { min: 100, max: 200 } },
-} as const;
-
-// ===== 数据服务接口 =====
+// ===== 数据服务 =====
 export interface DataService {
-  // 用户
   getUser(): UserProfile | null;
   setUser(user: UserProfile): void;
 
-  // 每日选菜
-  getDaySelection(date: string): DayMealSelection | null;
-  setDaySelection(selection: DayMealSelection): void;
+  getDaySelection(date: string): DaySelection | null;
+  setDaySelection(sel: DaySelection): void;
 
-  // 采购清单（共享）
   getShoppingList(): ShoppingList | null;
   setShoppingList(list: ShoppingList): void;
   toggleShoppingItem(itemId: string): void;
 
-  // 运动完成
   getExerciseCompletions(date: string, gender: Gender): ExerciseCompletion[];
-  setExerciseCompletion(completion: ExerciseCompletion & { gender: Gender }): void;
+  setExerciseCompletion(c: ExerciseCompletion & { gender: Gender }): void;
 
-  // 体重
   getWeightRecords(gender: Gender): WeightRecord[];
-  addWeightRecord(record: WeightRecord): void;
+  addWeightRecord(r: WeightRecord): void;
 
-  // 照片
   getPhotoRecords(gender: Gender): PhotoRecord[];
-  addPhotoRecord(record: PhotoRecord): void;
+  addPhotoRecord(r: PhotoRecord): void;
 
-  // 打卡
   getCheckInRecords(gender: Gender): CheckInRecord[];
-  checkIn(record: CheckInRecord): void;
+  checkIn(r: CheckInRecord): void;
   getStreak(gender: Gender): number;
 }

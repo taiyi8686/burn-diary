@@ -1,7 +1,7 @@
 import {
   DataService,
   UserProfile,
-  DayMealSelection,
+  DaySelection,
   ShoppingList,
   ExerciseCompletion,
   WeightRecord,
@@ -43,12 +43,12 @@ export class LocalDataService implements DataService {
     setItem("user", user);
   }
 
-  // ===== 每日选菜 =====
-  getDaySelection(date: string): DayMealSelection | null {
-    return getItem<DayMealSelection>(`selection:${date}`);
+  // ===== 每日选择 =====
+  getDaySelection(date: string): DaySelection | null {
+    return getItem<DaySelection>(`selection:${date}`);
   }
 
-  setDaySelection(selection: DayMealSelection): void {
+  setDaySelection(selection: DaySelection): void {
     setItem(`selection:${selection.date}`, selection);
   }
 

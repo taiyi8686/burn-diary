@@ -1,34 +1,27 @@
-import { Recipe, Gender, ShoppingItem, ShoppingDuration } from "@/types";
+import { DayPlan, Gender, ShoppingItem } from "@/types";
 
-// 根据选中的菜谱 + 性别 + 采购时长 → 生成采购清单
+// 根据选中的日计划 + 性别 + 人数 → 生成采购清单
 export function generateShoppingList(
-  recipes: Recipe[],
+  plan: DayPlan,
   gender: Gender,
-  duration: ShoppingDuration
+  servings: 1 | 2
 ): ShoppingItem[] {
-  // 确定倍数
-  const multiplier = duration === "one-meal" ? 1 : duration === "one-day" ? 1 : 2;
-  // one-meal 模式：食材不合并，每个菜单独列
-  // one-day / two-days：所有菜合并食材
+  // 收集三餐所有食材并按名称合并
+  const ingredientMap = new Map<string, { amount: string; category: string }>();
+  const meals = [plan.lunch, plan.dinner, plan.snack];
 
-  // 收集所有食材并按名称合并
-  const ingredientMap = new Map<string, { amount: string; category: string; count: number }>();
-
-  for (const recipe of recipes) {
-    for (const ing of recipe.ingredients) {
-      const amount = gender === "he" ? ing.amountHe : ing.amountShe;
-      const key = ing.name;
+  for (const meal of meals) {
+    for (const item of meal.items) {
+      const baseAmount = gender === "he" ? item.amountHe : item.amountShe;
+      const key = item.name;
 
       if (ingredientMap.has(key)) {
         const existing = ingredientMap.get(key)!;
-        // 尝试合并数量
-        existing.amount = mergeAmounts(existing.amount, amount, multiplier > 1 ? multiplier : 1);
-        existing.count++;
+        existing.amount = mergeAmounts(existing.amount, baseAmount);
       } else {
         ingredientMap.set(key, {
-          amount: multiplyAmount(amount, multiplier),
-          category: ing.category,
-          count: 1,
+          amount: baseAmount,
+          category: item.category,
         });
       }
     }
@@ -38,12 +31,12 @@ export function generateShoppingList(
   const items: ShoppingItem[] = [];
   let idx = 0;
   ingredientMap.forEach((val, name) => {
-    // 跳过"适量""少许"等调料
     if (isSkippable(val.amount)) return;
+    const finalAmount = servings === 2 ? multiplyAmount(val.amount, 2) : val.amount;
     items.push({
       id: `shop-${idx++}`,
       name,
-      amount: val.amount,
+      amount: finalAmount,
       category: val.category,
       checked: false,
     });
@@ -67,7 +60,7 @@ function isSkippable(amount: string): boolean {
   return ["适量", "少许"].includes(amount.trim());
 }
 
-// 简单的数量翻倍（处理 "200g" → "400g", "1个" → "2个" 等）
+// 数量翻倍（处理 "200g" → "400g", "1个" → "2个" 等）
 function multiplyAmount(amount: string, multiplier: number): string {
   if (multiplier === 1) return amount;
   const match = amount.match(/^(\d+\.?\d*)(.*)/);
@@ -79,16 +72,16 @@ function multiplyAmount(amount: string, multiplier: number): string {
   return `${amount} ×${multiplier}`;
 }
 
-// 合并两个食材用量（简化处理：同单位相加，不同单位列出两个）
-function mergeAmounts(a: string, b: string, multiplier: number): string {
+// 合并两个同名食材用量
+function mergeAmounts(a: string, b: string): string {
   const matchA = a.match(/^(\d+\.?\d*)(g|ml|个|根|片|颗|把|碗|张|瓣|罐)/);
   const matchB = b.match(/^(\d+\.?\d*)(g|ml|个|根|片|颗|把|碗|张|瓣|罐)/);
 
   if (matchA && matchB && matchA[2] === matchB[2]) {
-    const total = (parseFloat(matchA[1]) + parseFloat(matchB[1])) * (multiplier > 1 ? multiplier / 2 : 1);
+    const total = parseFloat(matchA[1]) + parseFloat(matchB[1]);
     return `${total % 1 === 0 ? total : total.toFixed(1)}${matchA[2]}`;
   }
 
-  // 无法合并，直接返回 a（首个的量）
-  return a;
+  // 单位不同无法合并，返回合计描述
+  return `${a}+${b}`;
 }

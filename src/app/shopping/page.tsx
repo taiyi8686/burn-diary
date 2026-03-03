@@ -4,65 +4,60 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useUserStore } from "@/lib/store";
 import { useData } from "@/lib/DataContext";
 import { getBeijingDateStr } from "@/lib/utils";
-import { getRecipeById } from "@/data/meals";
+import { getPlanById } from "@/data/dayplans";
 import { generateShoppingList, groupByCategory } from "@/data/shopping";
-import { ShoppingItem, ShoppingDuration, ShoppingList } from "@/types";
-
-const DURATION_OPTIONS: { value: ShoppingDuration; label: string; desc: string }[] = [
-  { value: "one-meal", label: "一顿", desc: "只买一顿的量" },
-  { value: "one-day", label: "一天", desc: "买今天全部食材" },
-  { value: "two-days", label: "两天", desc: "一次买两天的量" },
-];
+import { ShoppingItem, ShoppingList } from "@/types";
 
 export default function ShoppingPage() {
   const gender = useUserStore((s) => s.gender);
   const data = useData();
   const today = getBeijingDateStr();
 
-  const [duration, setDuration] = useState<ShoppingDuration>("one-day");
   const [items, setItems] = useState<ShoppingItem[]>([]);
   const [hasSelection, setHasSelection] = useState(false);
-  const [, setSavedList] = useState<ShoppingList | null>(null);
+  const [planName, setPlanName] = useState("");
+  const [servings, setServings] = useState<1 | 2>(2);
 
-  // 从今日选菜加载
   const loadFromSelection = useCallback(() => {
     if (!gender) return;
     const sel = data.getDaySelection(today);
-    if (!sel || (!sel.lunchId && !sel.dinnerId && !sel.snackId)) {
+    if (!sel || !sel.planId) {
       setHasSelection(false);
       // 尝试加载已保存的清单
       const saved = data.getShoppingList();
       if (saved && saved.items.length > 0) {
-        setSavedList(saved);
         setItems(saved.items);
-        setDuration(saved.duration);
+        setServings(saved.servings as 1 | 2);
+        const plan = getPlanById(saved.planId);
+        if (plan) setPlanName(plan.name);
       }
       return;
     }
     setHasSelection(true);
 
-    const recipeIds = [sel.lunchId, sel.dinnerId, sel.snackId].filter(Boolean) as string[];
-    const recipes = recipeIds.map(getRecipeById).filter(Boolean) as NonNullable<ReturnType<typeof getRecipeById>>[];
+    const plan = getPlanById(sel.planId);
+    if (!plan) return;
+    setPlanName(plan.name);
+    setServings(sel.servings);
 
-    // 检查是否已有保存的清单且菜谱没变
+    // 检查是否已有保存的清单且计划没变
     const saved = data.getShoppingList();
-    if (saved && saved.generatedFrom.join(",") === recipeIds.join(",") && saved.duration === duration) {
-      setSavedList(saved);
+    if (saved && saved.planId === sel.planId && saved.servings === sel.servings) {
       setItems(saved.items);
       return;
     }
 
-    const newItems = generateShoppingList(recipes, gender, duration);
+    // 生成新清单
+    const newItems = generateShoppingList(plan, gender, sel.servings);
     const newList: ShoppingList = {
       items: newItems,
-      duration,
-      generatedFrom: recipeIds,
+      planId: sel.planId,
+      servings: sel.servings,
       lastGenerated: new Date().toISOString(),
     };
     data.setShoppingList(newList);
-    setSavedList(newList);
     setItems(newItems);
-  }, [data, today, gender, duration]);
+  }, [data, today, gender]);
 
   useEffect(() => {
     loadFromSelection();
@@ -70,28 +65,9 @@ export default function ShoppingPage() {
 
   const toggleItem = (itemId: string) => {
     data.toggleShoppingItem(itemId);
-    // 重新读取
     const saved = data.getShoppingList();
     if (saved) setItems(saved.items);
   };
-
-  const regenerate = useCallback((dur: ShoppingDuration) => {
-    if (!gender) return;
-    const sel = data.getDaySelection(today);
-    if (!sel) return;
-    const recipeIds = [sel.lunchId, sel.dinnerId, sel.snackId].filter(Boolean) as string[];
-    const recipes = recipeIds.map(getRecipeById).filter(Boolean) as NonNullable<ReturnType<typeof getRecipeById>>[];
-    const newItems = generateShoppingList(recipes, gender, dur);
-    const newList: ShoppingList = {
-      items: newItems,
-      duration: dur,
-      generatedFrom: recipeIds,
-      lastGenerated: new Date().toISOString(),
-    };
-    data.setShoppingList(newList);
-    setSavedList(newList);
-    setItems(newItems);
-  }, [data, today, gender]);
 
   const grouped = groupByCategory(items);
   const checkedCount = items.filter((i) => i.checked).length;
@@ -109,7 +85,8 @@ export default function ShoppingPage() {
           <span className="text-4xl mb-4">🛒</span>
           <h3 className="text-base font-semibold text-white mb-2">还没有采购清单</h3>
           <p className="text-sm text-white/40 leading-relaxed">
-            先去「饮食」页面选好今天的菜谱，<br />
+            先去「饮食」页面选好今天的食谱，
+            <br />
             采购清单会自动生成哦
           </p>
         </div>
@@ -123,29 +100,10 @@ export default function ShoppingPage() {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-xl font-bold text-white">采购清单</h1>
-          <p className="text-xs text-white/40 mt-0.5">根据你选的菜谱自动生成</p>
+          <p className="text-xs text-white/40 mt-0.5">
+            {planName} · {servings === 1 ? "一人份" : "两人份"}
+          </p>
         </div>
-      </div>
-
-      {/* 采购时长选择 */}
-      <div className="flex gap-2 mb-4">
-        {DURATION_OPTIONS.map((opt) => (
-          <button
-            key={opt.value}
-            onClick={() => {
-              setDuration(opt.value);
-              regenerate(opt.value);
-            }}
-            className={`flex-1 py-2.5 rounded-xl text-xs font-medium min-h-touch transition-all ${
-              duration === opt.value
-                ? "bg-primary/15 text-primary border border-primary/30"
-                : "card text-white/50"
-            }`}
-          >
-            <div>{opt.label}</div>
-            <div className="text-[10px] mt-0.5 opacity-60">{opt.desc}</div>
-          </button>
-        ))}
       </div>
 
       {/* 进度条 */}
@@ -197,8 +155,18 @@ export default function ShoppingPage() {
                       }`}
                     >
                       {item.checked && (
-                        <svg className="w-3 h-3 text-surface-dark" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        <svg
+                          className="w-3 h-3 text-surface-dark"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={3}
+                            d="M5 13l4 4L19 7"
+                          />
                         </svg>
                       )}
                     </div>
